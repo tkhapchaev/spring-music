@@ -18,6 +18,21 @@ repositories {
 
 ext {
     javaCfEnvVersion = '3.1.2'
+    playwrightVersion = '1.59.0'
+}
+
+sourceSets {
+    e2eTest {
+        java.srcDir file('src/e2eTest/java')
+        resources.srcDir file('src/e2eTest/resources')
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+}
+
+configurations {
+    e2eTestImplementation.extendsFrom testImplementation
+    e2eTestRuntimeOnly.extendsFrom testRuntimeOnly
 }
 
 dependencies {
@@ -56,6 +71,7 @@ dependencies {
     // Testing
     testImplementation "junit:junit"
     testImplementation "org.springframework.boot:spring-boot-starter-test"
+    e2eTestImplementation "com.microsoft.playwright:playwright:${playwrightVersion}"
 }
 
 java {
@@ -74,4 +90,23 @@ jar {
 
 tasks.named("bootBuildImage") {
     builder = "paketobuildpacks/builder-jammy-base:latest"
+}
+
+tasks.register("playwrightInstall", JavaExec) {
+    group = "verification"
+    description = "Install Playwright browsers and ffmpeg for Java E2E tests"
+    classpath = sourceSets.e2eTest.runtimeClasspath
+    mainClass = "com.microsoft.playwright.CLI"
+    args "install", "chromium", "ffmpeg"
+}
+
+tasks.register("e2eTest", Test) {
+    group = "verification"
+    description = "Run Java Playwright E2E tests"
+    testClassesDirs = sourceSets.e2eTest.output.classesDirs
+    classpath = sourceSets.e2eTest.runtimeClasspath
+    useJUnitPlatform()
+    outputs.upToDateWhen { false }
+    shouldRunAfter test
+    systemProperty "e2e.artifacts.dir", layout.buildDirectory.dir("playwright-results").get().asFile.absolutePath
 }
